@@ -18,41 +18,25 @@
 #define MONOPHONIC        1
 #define STEREOPHONIC      2
 
-//struct WavHeader {
-//    //from http://soundfile.sapp.org/doc/WaveFormat/
-//    //RIFF Chunk Descriptor
-//    char chunkID[4];
-//    uint32_t chunkSize;
-//    char format[4];
-
-//    //fmt sub-chunk
-//    char subchunk1ID[4];
-//    uint32_t subchunk1Size;
-//    uint16_t audioFormat;
-//    uint16_t numChannels;
-//    uint32_t sampleRate;
-//    uint32_t byteRate;
-//    uint16_t blockAlign;
-//    uint16_t bitsPerSample;
-
-//    //data sub-chunk
-//    char subchunk2ID[4];
-//    uint32_t subchunk2Size;
-//};
-
 //NOTE: according to http://soundfile.sapp.org/doc/WaveFormat/ " 16-bit samples are stored as 2's-complement signed integers, ranging from -32768 to 32767. "
 
 //convert a 16-bit 2's-complement signed integer to a float scaled to -1.0 to +1.0
-float sampleToFloat(int16_t value) {
+float sampleToFloat(int16_t value){
    int16_t maxVal = 32767;
 
-   float result = value / maxVal;
-
-   return result;
+   if (value < 0){
+        int16_t absValue = abs(value);
+        float result = (float)absValue / (float)maxVal;
+        return -result;
+   }
+   else {
+        float result = (float)value / (float)maxVal;
+        return result;
+   }
 }
 
 //convert a float scaled to -1.0 to +1.0 to a 16-bit 2's-complement signed integer
-int16_t floatToSample(float value) {
+int16_t floatToSample(float value){
    int16_t maxVal = 32767;
 
    //this is how testtone.c does it
@@ -62,77 +46,30 @@ int16_t floatToSample(float value) {
 }
 
 //convert the vector of wav samples to floats
-std::vector<float> samplesToFloats(std::vector<int16_t> samples) {
+std::vector<float> samplesToFloats(std::vector<int16_t> samples){
    std::vector<float> floatSamples;
-   for (int16_t sample : samples) {
-       float convertedSample = sampleToFloat(sample);
-       floatSamples.push_back(convertedSample);
+   for (int16_t sample : samples){
+        float convertedSample = sampleToFloat(sample);
+        floatSamples.push_back(convertedSample);
    }
    return floatSamples;
 }
 
 //convert the vector of floats into wav samples
-std::vector<int16_t> floatsToSamples(std::vector<float> floatSamples) {
+std::vector<int16_t> floatsToSamples(std::vector<float> floatSamples){
    std::vector<int16_t> samples;
-   for (float sample : floatSamples) {
-       int16_t convertedSample = floatToSample(sample);
-       samples.push_back(convertedSample);
-   }
+   for (float sample : floatSamples){
+        int16_t convertedSample = floatToSample(sample);
+        samples.push_back(convertedSample);
+    }
    return samples;
 }
 
 
-
-std::vector<int16_t> readWavFile(char *filename) {
-    // FILE *inputFileStream = fopen(filename, "rb");
-    // if (inputFileStream == NULL) {
-    //     fprintf(stdout, "File %s cannot be opened for reading\n", filename);
-    //     return std::vector<int16_t>();
-    // }
-
-    // WavHeader header;
-
-    // //read header
-    // size_t bytesRead = fread(&header, sizeof(header), 1, inputFileStream);
-    // if (bytesRead != 1) {
-    //     fprintf(stdout, "Error reading WAV header.\n");
-    //     fclose(inputFileStream);
-    //     return std::vector<int16_t>();
-    // }
-
-    // std::cout << "subchunk2Size: " << header.subchunk2Size << std::endl; //this is way off for some reason??
-
-    // //store samples
-    // int16_t* audioSamplesArray = new int16_t[header.subchunk2Size / sizeof(int16_t)];
-    // bytesRead = fread(audioSamplesArray, sizeof(int16_t), header.subchunk2Size / sizeof(int16_t), inputFileStream);
-    // if (bytesRead != header.subchunk2Size / sizeof(int16_t)) {
-    //     fprintf(stdout, "Error reading audio sample data.\n");
-    //     delete[] audioSamplesArray;
-    //     fclose(inputFileStream);
-    //     return std::vector<int16_t>();
-    // }
-
-    // //sample vector
-    // std::vector<int16_t> audioSamples;
-    // for (size_t i = 0; i < header.subchunk2Size / sizeof(int16_t); ++i) {
-    //     audioSamples.push_back(audioSamplesArray[i]);
-    // }
-
-    // //Check if the file is mono, 16-bit, 44.1 kHz
-    // std::cout << header.numChannels << " " << header.bitsPerSample << " " << header.sampleRate << " " << header.subchunk2Size << std::endl;
-    // if (header.numChannels != 1 || header.bitsPerSample != 16 || header.sampleRate != 44100) {
-    //     std::cout << "Unsupported WAV file format. Must be mono, 16-bit, 44.1 kHz." << std::endl;
-    //     return std::vector<int16_t>();
-    // }
-    
-    // fclose(inputFileStream);
-    // return audioSamples;
-
-    // this isn't working, and apparently we're supposed to use fstream in c++ anyway https://stackoverflow.com/questions/25903590/c-vs-c-file-handling
-
+std::vector<int16_t> readWavFile(char *filename){
     std::ifstream file(filename, std::ios::binary);
 
-    if (!file.is_open()) {
+    if (!file.is_open()){
         fprintf(stdout, "File %s cannot be opened for reading\n", filename);
         return std::vector<int16_t>();
     }
@@ -143,7 +80,7 @@ std::vector<int16_t> readWavFile(char *filename) {
 
     //Check if the file is mono, 16-bit, 44.1 kHz
     //header[22] is numchannels, 34 is bits per sample, 24 and 26 is sample rate
-    if (header[22] != 1 || header[34] != 16 || *reinterpret_cast<int*>(header + 24) != 44100) {
+    if (header[22] != 1 || header[34] != 16 || *reinterpret_cast<int*>(header + 24) != 44100){
         std::cerr << "Unsupported WAV file format. Must be mono, 16-bit, 44.1 kHz." << std::endl;
         return std::vector<int16_t>();
     }
@@ -151,14 +88,13 @@ std::vector<int16_t> readWavFile(char *filename) {
     //store samples
     std::vector<int16_t> samples;
     int16_t sample;
-    while (file.read(reinterpret_cast<char*>(&sample), sizeof(int16_t))) {
+    while (file.read(reinterpret_cast<char*>(&sample), sizeof(int16_t))){
         samples.push_back(sample);
     }
 
     file.close();
     return samples;
 }
-
 
 //Note: The following are from testtone.c given on D2L
 size_t fwriteIntLSB(int data, FILE *stream)
@@ -238,9 +174,9 @@ void writeWaveFileHeader(int channels, int numberSamples,
 }
 
 //Function to write audio data to a new WAV file
-void writeWavFile(char *filename, std::vector<int16_t> samples, int numberOfChannels) {
+void writeWavFile(char *filename, std::vector<int16_t> samples, int numberOfChannels){
     FILE *outputFileStream = fopen(filename, "wb");
-    if (outputFileStream == NULL) {
+    if (outputFileStream == NULL){
         fprintf(stdout, "File %s cannot be opened for writing\n", filename);
         return;
     }
@@ -253,7 +189,7 @@ void writeWavFile(char *filename, std::vector<int16_t> samples, int numberOfChan
                         SAMPLE_RATE, outputFileStream);
 
     //Write audio data (samples) to the file
-    for (int i = 0; i < numberOfSamples; i++) {
+    for (int i = 0; i < numberOfSamples; i++){
         fwriteShortLSB(samples[i], outputFileStream);
     }
 
@@ -261,12 +197,12 @@ void writeWavFile(char *filename, std::vector<int16_t> samples, int numberOfChan
 }
 
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]){
     char *inputFile = NULL;
     char *IRFile = NULL;
     char *outputFile = NULL;
 
-    if (argc != 4) {
+    if (argc != 4){
         std::cout << "Usage: " << argv[0] << " inputfile IRfile outputfile" << std::endl;
         return 1;
     }
@@ -277,19 +213,19 @@ int main(int argc, char *argv[]) {
 
     //get the data section of the input file as a vector
     std::vector<int16_t> wavSamples = readWavFile(inputFile);
-    if (wavSamples.empty()) {
+    if (wavSamples.empty()){
         return 1;
     }
     //ints to floats
-    //std::vector<float> floatSamples = samplesToFloats(wavSamples);
+    std::vector<float> floatSamples = samplesToFloats(wavSamples);
 
     //convolution stuff
 
     //floats back to ints
-    //std::vector<int16_t> outputSamples = floatsToSamples(floatSamples);
+    std::vector<int16_t> outputSamples = floatsToSamples(floatSamples);
 
     //Write the converted samples to a new WAV file
-    writeWavFile(outputFile, wavSamples, 1);
+    writeWavFile(outputFile, outputSamples, 1);
 
     std::cout << "Reverbification complete. Output file: " << outputFile << std::endl;
 
