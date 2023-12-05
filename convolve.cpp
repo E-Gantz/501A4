@@ -287,14 +287,14 @@ void zeroPadding(std::vector<double> input, int inSize, double output[], int fin
     }
 }
 
-//taken from tut slides
+//taken from tut slides and 311-318 in the smith text
 void convolve(std::vector<double> input, std::vector<double> filter, std::vector<double> &y){
     int N = input.size();
     int M = filter.size();
-    int output_size = (M)*2;
+    int output_size = (M);
     int paddingSize = nearestPower(output_size);
     int numChunkSamples = (paddingSize-(M-1));
-    int numChunks = rint((double)N/(double)numChunkSamples);
+    int numChunks = N/numChunkSamples;
     std::vector<double> OLAP(M-1, 0.0);
 
     double* paddedInput = new double[2*paddingSize];
@@ -304,21 +304,26 @@ void convolve(std::vector<double> input, std::vector<double> filter, std::vector
     for(int i=0; i<2*paddingSize; i++){
         paddedImpulse[i] = 0.0;
     }
-
-    zeroPadding(filter, M, paddedImpulse, 2*paddingSize);
+    int count = 0;
+    for (int i=0; i<M; i++){
+        paddedImpulse[count] = filter[i];
+        count += 2;
+    }
     four1(paddedImpulse-1, paddingSize, 1);
-
+    int inputPos = 0;
+    int outputPos = 0;
     for (int i=0; i<numChunks; i++){
-        int inputOffset = i*numChunkSamples;
         for(int j=0; j<2*paddingSize; j++){
             paddedInput[j] = 0.0;
         }
         int counter = 0;
-        for (int j=0; j<numChunkSamples; j++){
-            paddedInput[counter] = input[inputOffset + j];
+        for (int j=0; j<paddingSize-(M-1); j++){
+            paddedInput[counter] = input[inputPos];
+            inputPos++;
             counter += 2;
         }
         four1(paddedInput-1, paddingSize, 1);
+        
         //complex multiplication
         for (int j=0; j<2*paddingSize; j+=2){
             double temp = (paddedInput[j]*paddedImpulse[j]) - (paddedInput[j+1]*paddedImpulse[j+1]);
@@ -338,16 +343,17 @@ void convolve(std::vector<double> input, std::vector<double> filter, std::vector
         for (int j=0; j<M-1; j++){
             paddedOutput[j] = paddedOutput[j] + OLAP[j];
         }
-        for (int j = numChunkSamples; j<paddingSize; j++){
+        for (int j = numChunkSamples; j<numChunkSamples+(M-1); j++){
             OLAP[j-numChunkSamples] = paddedOutput[j];
         }
         for (int j=0; j<numChunkSamples; j++){
-            y[inputOffset + j] = paddedOutput[j];
+            y[outputPos] = paddedOutput[j];
+            outputPos++;
         }
     }
-    int inputOffset = (numChunks)*numChunkSamples;
     for (int j=0; j<M-1; j++){
-        y[inputOffset + j] = OLAP[j];
+        y[outputPos] = OLAP[j];
+        outputPos++;
     }
 }
 
