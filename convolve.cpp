@@ -27,33 +27,34 @@
 
 //convert a 16-bit 2's-complement signed integer to a double scaled to -1.0 to +1.0
 double sampleTodouble(int16_t value){
-   int16_t maxVal = 32767;
+//    int16_t maxVal = 32767;
 
-   if (value < 0){
-        int16_t absValue = abs(value);
-        double result = (double)absValue / (double)maxVal;
-        return -result;
-   }
-   else {
-        double result = (double)value / (double)maxVal;
-        return result;
-   }
+//    if (value < 0){
+//         double absValue = abs(value);
+//         double result = (double)absValue / (double)maxVal;
+//         return -result;
+//    }
+//    else {
+//         double result = (double)value / (double)maxVal;
+//         return result;
+//    }
+
+    return double(value) / (double)32767.0;
 }
 
 //convert a double scaled to -1.0 to +1.0 to a 16-bit 2's-complement signed integer
 int16_t doubleToSample(double value){
     int16_t maxVal = 32767;
     int16_t result;
-    // if (value > 1.0){
-    //     result = maxVal;
-    // }
-    // else if (value < -1.0){
-    //     result = -maxVal;
-    // }
-    // else {
-    //     result = rint(value * maxVal);
-    // }
-    result = rint(value * maxVal);
+    if (value >= 1.0){
+        result = maxVal;
+    }
+    else if (value <= -1.0){
+        result = -maxVal;
+    }
+    else {
+        result = rint((double)value * (double)maxVal);
+    }
 
     return result;
 }
@@ -218,7 +219,7 @@ void writeWavFile(char *filename, std::vector<int16_t> samples, int numberOfChan
 //  at index 1, not 0, so subtract 1 when
 //  calling the routine (see main() below).
 
-void four1(double data[], int nn, int isign)
+void four1(double data[], unsigned long nn, int isign)
 {
     unsigned long n, mmax, m, j, istep, i;
     double wtemp, wr, wpr, wpi, wi, theta;
@@ -279,22 +280,10 @@ int nearestPower(int M){
 }
 
 void zeroPadding(std::vector<double> input, int inSize, double output[], int finalSize){
-    int i=0;
-    int counter=0;
-    while (i<finalSize){
-        if (counter < inSize){
-            output[i] = input[i];
-        }
-        else{
-            output[i] = 0.0;
-        }
-        counter++;
-        i++;
-        if (i=finalSize){
-            break;
-        }
-        output[i] = 0.0;
-        i++;
+    int counter = 0;
+    for (int i=0; i<inSize; i++){
+        output[counter] = input[i];
+        counter += 2;
     }
 }
 
@@ -304,14 +293,21 @@ void convolve(std::vector<double> input, std::vector<double> filter, std::vector
     int M = filter.size();
     int output_size = N+(M-1);
 
-    int paddingSize = 1;
-    while (paddingSize < output_size){
-        paddingSize*=2;
-    }
+    int paddingSize = nearestPower(output_size);
+    // int paddingSize = 1;
+    // while (paddingSize < output_size){
+    //     paddingSize*=2;
+    // }
 
     double* paddedInput = new double[2*paddingSize];
     double* paddedImpulse = new double[2*paddingSize];
     double* paddedOutput = new double[2*paddingSize];
+
+    for(int i=0; i<2*paddingSize; i++){
+        paddedInput[i] = 0.0;
+        paddedImpulse[i] = 0.0;
+        paddedOutput[i] = 0.0;
+    }
 
     zeroPadding(input, N, paddedInput, 2*paddingSize);
     zeroPadding(filter, M, paddedImpulse, 2*paddingSize);
@@ -324,15 +320,25 @@ void convolve(std::vector<double> input, std::vector<double> filter, std::vector
         paddedInput[j+1] = (paddedInput[j]*paddedImpulse[j+1]) + (paddedInput[j+1]*paddedImpulse[j]);
         paddedInput[j] = temp;
     }
-
-    four1(paddedInput, paddingSize, -1);
-
-    for (int j=0; j<2*paddingSize; j++){
-        paddedInput[j] = (double)paddedInput[j] / (double)N;
+    for (int i=0; i<2*paddingSize; i++){
+        paddedOutput[i] = paddedInput[i];
     }
 
+    // for (int j=0; j<2*paddingSize; j++){
+    //     paddedOutput[j] = paddedInput[j] * paddedImpulse[j];
+    // }
+
+    four1(paddedOutput-1, paddingSize, -1);
+
+    for (int j=0; j<2*paddingSize; j++){
+        paddedOutput[j] = (double)paddedOutput[j] / (double)N;
+        paddedOutput[j] = (double)paddedOutput[j] / (double)4.0;
+    }
+
+    int counter = 0;
     for (int j=0; j<y.size(); j++){
-        y[j] = paddedInput[j];
+        y[j] = paddedOutput[counter];
+        counter+=2;
     }
 }
 
