@@ -1,0 +1,15 @@
+**House Keeping**
+Timing reports are output from the Measure-Command utility on windows 11, these are in the timings folder.
+GuitarDry.wav and bigHall.wav were used for all timings.
+
+The baseline version can be found in convolveBaseline.cpp
+Baseline Version Time: 823738.9601ms
+
+**Optimizations**
+The first optimization I did was an algorithm-based optimization.
+I chose to use the overlap-add algorithm from p.311-318 in the Smith text, and I used the four1 FFT that we were given.
+Algorithm optimized time: 3542.7792ms
+
+Next I did a compiler-level optimization. I changed from compiling with "g++ -o convolve convolve.cpp" to "g++ -O3 -o convolve convolve.cpp"
+At this point I also started using the diff command to do regression testing.
+compiler optimized time: 1653.1691ms
