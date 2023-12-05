@@ -283,11 +283,11 @@ void convolve(std::vector<double> input, std::vector<double> filter, std::vector
     int N = input.size();
     int M = filter.size();
     int outSize = nearestPower(M);
-    int numInSamples = outSize-(M-1);
-    int numChunks = N/numInSamples;//fix this
+    int numChunkSamples = outSize-(M-1);
+    int numChunks = N/numChunkSamples;//fix this
     int fftSize = outSize/2;
 
-    double XX[outSize];
+    double* XX = new double[outSize];
     std::vector<double> REX(fftSize, 0.0);
     std::vector<double> IMX(fftSize, 0.0);
     std::vector<double> REFR(fftSize, 0.0);
@@ -295,12 +295,19 @@ void convolve(std::vector<double> input, std::vector<double> filter, std::vector
     std::vector<double> OLAP(M-1, 0.0);
 
     //use FFT to fill in REFR and IMFR
+    // "After defining and initializing all
+    // the arrays (lines 130 to 230), the first step is to calculate and store the
+    // frequency response of the filter (lines 250 to 310). Line 260 calls a
+    // mythical subroutine that loads the filter kernel into XX[0] through
+    // XX[399], and sets XX[400] through XX[1023] to a value of zero."
     for (int i=0; i<M; i++){
         XX[i] = filter[i];
     }
     for (int i=M; i<outSize; i++){
         XX[i] = 0.0;
     }
+    // The subroutine in line 270 is the FFT, transforming the 1024 samples held in
+    // XX[ ] into the 513 samples held in REFR[ ] & IMFR[ ] 
     four1(XX-1, fftSize, 1);
     int counter = 0;
     for (int i=0; i<outSize-1; i+=2){
@@ -311,11 +318,11 @@ void convolve(std::vector<double> input, std::vector<double> filter, std::vector
 
     for (int i=0; i<numChunks; i++){
         //use FFT to fill REX and IMX
-        int inputOffset = i*numInSamples;
-        for (int j=0; j<numInSamples; j++){
+        int inputOffset = i*numChunkSamples;
+        for (int j=0; j<numChunkSamples; j++){
             XX[j] = input[inputOffset + j];
         }
-        for (int j=numInSamples; j<outSize; j++){
+        for (int j=numChunkSamples; j<outSize; j++){
             XX[j] = 0.0;
         }
         four1(XX-1, fftSize, 1);
@@ -351,11 +358,11 @@ void convolve(std::vector<double> input, std::vector<double> filter, std::vector
             XX[j] = XX[j] + OLAP[j];
         }
 
-        for (int j = numInSamples; j<outSize; j++){
-            OLAP[j-numInSamples] = XX[j];
+        for (int j = numChunkSamples; j<outSize; j++){
+            OLAP[j-numChunkSamples] = XX[j];
         }
 
-        for (int j=0; j<numInSamples; j++){
+        for (int j=0; j<numChunkSamples; j++){
             y[inputOffset + j] = XX[j];
         }
     }
