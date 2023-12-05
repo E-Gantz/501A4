@@ -278,61 +278,106 @@ int nearestPower(int M){
     }
 }
 
-void zeroPadding(std::vector<double> input, int inSize, double output[], int finalSize){
-    int i=0;
-    int counter=0;
-    while (i<finalSize){
-        if (counter < inSize){
-            output[i] = input[i];
-        }
-        else{
-            output[i] = 0.0;
-        }
-        counter++;
-        i++;
-        if (i=finalSize){
-            break;
-        }
-        output[i] = 0.0;
-        i++;
-    }
-}
-
-//taken from tut slides
+//taken from 311-318 in the smith text
 void convolve(std::vector<double> input, std::vector<double> filter, std::vector<double> &y){
     int N = input.size();
     int M = filter.size();
-    int output_size = N+(M-1);
+    int outSize = nearestPower(M)*2;
+    int numChunkSamples = M-1;
+    int numChunks = N/numChunkSamples;//fix this
+    int fftSize = outSize/2;
 
-    int paddingSize = 1;
-    while (paddingSize < output_size){
-        paddingSize*=2;
+    double* XX = new double[outSize];
+    std::vector<double> REX(fftSize, 0.0);
+    std::vector<double> IMX(fftSize, 0.0);
+    std::vector<double> REFR(fftSize, 0.0);
+    std::vector<double> IMFR(fftSize, 0.0);
+    std::vector<double> OLAP(M-1, 0.0);
+
+    //use FFT to fill in REFR and IMFR
+    // "After defining and initializing all
+    // the arrays (lines 130 to 230), the first step is to calculate and store the
+    // frequency response of the filter (lines 250 to 310). Line 260 calls a
+    // mythical subroutine that loads the filter kernel into XX[0] through
+    // XX[399], and sets XX[400] through XX[1023] to a value of zero."
+    int counter = 0;
+    for (int i=0; i<M; i++){
+        XX[counter] = filter[i];
+        counter++;
+        XX[counter] = 0.0;
+        counter++;
+    }
+    while (counter < outSize){
+        XX[counter] = 0.0;
+        counter++;
+    }
+    // The subroutine in line 270 is the FFT, transforming the 1024 samples held in
+    // XX[ ] into the 513 samples held in REFR[ ] & IMFR[ ] 
+    four1(XX-1, fftSize, 1);
+    counter = 0;
+    for (int i=0; i<outSize-1; i+=2){
+        REFR[counter] = XX[i];
+        IMFR[counter] = XX[i+1];
+        counter++;
     }
 
-    double* paddedInput = new double[2*paddingSize];
-    double* paddedImpulse = new double[2*paddingSize];
-    double* paddedOutput = new double[2*paddingSize];
+    for (int i=0; i<numChunks; i++){
+        //use FFT to fill REX and IMX
+        int inputOffset = i*numChunkSamples;
+        counter = 0;
+        for (int j=0; j<numChunkSamples; j++){
+            XX[counter] = input[inputOffset + j];
+            counter++;
+            XX[counter] = 0.0;
+            counter++;
+        }
+        while (counter < outSize){
+            XX[counter] = 0.0;
+            counter++;
+        }
+        four1(XX-1, fftSize, 1);
+        counter = 0;
+        for (int j=0; j<outSize-1; j+=2){
+            REX[counter] = XX[j];
+            IMX[counter] = XX[j+1];
+            counter++;
+        }
 
-    zeroPadding(input, N, paddedInput, 2*paddingSize);
-    zeroPadding(filter, M, paddedImpulse, 2*paddingSize);
-    four1(paddedInput-1, paddingSize, 1);
-    four1(paddedImpulse-1, paddingSize, 1);
+        for (int j=0; j<fftSize; j++){
+            double temp = (REX[j]*REFR[j]) - (IMX[j]*IMFR[j]);
+            IMX[j] = (REX[j]*IMFR[j]) + (IMX[j]*REFR[j]);
+            REX[j] = temp;
+        }
 
-    //complex multiplication
-    for (int j=0; j<2*paddingSize; j+=2){
-        double temp = (paddedInput[j]*paddedImpulse[j]) - (paddedInput[j+1]*paddedImpulse[j+1]);
-        paddedInput[j+1] = (paddedInput[j]*paddedImpulse[j+1]) + (paddedInput[j+1]*paddedImpulse[j]);
-        paddedInput[j] = temp;
+        //use IFFT to combine REX and IMX into XX
+        counter = 0;
+        for (int j=0; j<fftSize; j++){
+            XX[counter] = REX[j];
+            counter ++;
+            XX[counter] = IMX[j];
+            counter++;
+        }
+        four1(XX-1, fftSize, -1);
+
+        //Scale the output by N
+        for (int j=0; j<outSize; j++){
+            XX[j] = (double)XX[j] / (double)N;
+        }
+
+        for (int j=0; j<M-1; j++){
+            XX[j] = XX[j] + OLAP[j];
+        }
+
+        for (int j = numChunkSamples; j<numChunkSamples+(M-1); j++){
+            OLAP[j-numChunkSamples] = XX[j];
+        }
+        for (int j=0; j<numChunkSamples; j++){
+            y[inputOffset + j] = XX[j];
+        }
     }
 
-    four1(paddedInput, paddingSize, -1);
-
-    for (int j=0; j<2*paddingSize; j++){
-        paddedInput[j] = (double)paddedInput[j] / (double)N;
-    }
-
-    for (int j=0; j<y.size(); j++){
-        y[j] = paddedInput[j];
+    for (int i=0; i<M-1; i++){
+        y[N-1 + i] = OLAP[i];
     }
 }
 
