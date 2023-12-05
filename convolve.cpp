@@ -271,17 +271,19 @@ int nearestPower(int M){
 void convolve(std::vector<double> input, std::vector<double> filter, std::vector<double> &y){
     int N = input.size();
     int M = filter.size();
+    int m = M-1;
     int output_size = (M);
     int paddingSize = nearestPower(output_size);
-    int numChunkSamples = (paddingSize-(M-1));
+    int bigPad = 2*paddingSize;
+    int numChunkSamples = (paddingSize-(m));
     int numChunks = N/numChunkSamples;
-    std::vector<double> OLAP(M-1, 0.0);
+    std::vector<double> OLAP(m, 0.0);
 
-    double* paddedInput = new double[2*paddingSize];
-    double* paddedImpulse = new double[2*paddingSize];
+    double* paddedInput = new double[bigPad];
+    double* paddedImpulse = new double[bigPad];
     double* paddedOutput = new double[paddingSize];
 
-    for(int i=0; i<2*paddingSize; i++){
+    for(int i=0; i<bigPad; i++){
         paddedImpulse[i] = 0.0;
     }
     int count = 0;
@@ -293,11 +295,11 @@ void convolve(std::vector<double> input, std::vector<double> filter, std::vector
     int inputPos = 0;
     int outputPos = 0;
     for (int i=0; i<numChunks; i++){
-        for(int j=0; j<2*paddingSize; j++){
+        for(int j=0; j<bigPad; j++){
             paddedInput[j] = 0.0;
         }
         int counter = 0;
-        for (int j=0; j<paddingSize-(M-1); j++){
+        for (int j=0; j<paddingSize-(m); j++){
             paddedInput[counter] = input[inputPos];
             inputPos++;
             counter += 2;
@@ -305,7 +307,7 @@ void convolve(std::vector<double> input, std::vector<double> filter, std::vector
         four1(paddedInput-1, paddingSize, 1);
         
         //complex multiplication
-        for (int j=0; j<2*paddingSize; j+=2){
+        for (int j=0; j<bigPad; j+=2){
             double temp = (paddedInput[j]*paddedImpulse[j]) - (paddedInput[j+1]*paddedImpulse[j+1]);
             paddedInput[j+1] = (paddedInput[j]*paddedImpulse[j+1]) + (paddedInput[j+1]*paddedImpulse[j]);
             paddedInput[j] = temp;
@@ -320,10 +322,10 @@ void convolve(std::vector<double> input, std::vector<double> filter, std::vector
             paddedOutput[j] = (double)paddedOutput[j] / (double)N;
             paddedOutput[j] = (double)paddedOutput[j] * (double)1.7;    //turn the gain up a little bit
         }
-        for (int j=0; j<M-1; j++){
+        for (int j=0; j<m; j++){
             paddedOutput[j] = paddedOutput[j] + OLAP[j];
         }
-        for (int j = numChunkSamples; j<numChunkSamples+(M-1); j++){
+        for (int j = numChunkSamples; j<numChunkSamples+(m); j++){
             OLAP[j-numChunkSamples] = paddedOutput[j];
         }
         for (int j=0; j<numChunkSamples; j++){
@@ -331,7 +333,7 @@ void convolve(std::vector<double> input, std::vector<double> filter, std::vector
             outputPos++;
         }
     }
-    for (int j=0; j<M-1; j++){
+    for (int j=0; j<m; j++){
         y[outputPos] = OLAP[j];
         outputPos++;
     }
