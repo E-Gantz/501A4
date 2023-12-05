@@ -22,7 +22,7 @@ First I found that in sampleToDouble I was checking if the input value was negat
 note that this method is run from a loop, so this effectively 'unswitches' the loop by removing if statements within the loop.
 I also removed the final print statement, as it was unnecessary I/O, and the zeroPadding method as i had already inlined it.
 this version can be found at https://github.com/E-Gantz/501A4/blob/ea405d43946d6e87c9a36f0ffac8fb2f53d58cd9/convolve.cpp
-manual tuning time: 1397.9484ms
+manual tuning time: 1503.1768ms
 
 Next I looked for other functions I could inline, but found none, and values that were being recalculated that I could cache.
 The most obvious one was M-1, so I cached that to use throughout my convolve method.
@@ -30,3 +30,10 @@ I also found that I was using 2*paddingSize a lot which not only is a repeated o
 note that by 'cached' I mean U put the result in a variable and used the variable instead of the calculation. I'm not sure if you can change the system cache in C++ in a similar way to manually using the registers, but I didn't do anything of that sort.
 Another optimization I had done earlier was changing from tracking the position in the input and output vectors via an offset variable (i*number of samples per segment, i goes from 0 to number of segments-1) to 
 just tracking the position using the inputPos and outputPos variables, which removes one multiplication per loop.
+this version can be found at https://github.com/E-Gantz/501A4/blob/9c4f2d991b5313df9b19c18216534599104b0905/convolve.cpp
+manual tuning time: 1434.0383ms
+
+I then noticed I had a lot of little for loops within the convolve function, and looked for some that I could jam together.
+I had two consecutive "for (int j=0; j<paddingSize; j++)" loops, one to fill the output vector from the real part of the post IFFT vector, and one to scale the values, so I combined these into one loop.
+at this point four1 had gone up to over 80% of the run time according to gprof, which shows that I increased the speed of the other parts.
+manual tuning time: 1322.2385ms

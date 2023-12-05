@@ -316,11 +316,9 @@ void convolve(std::vector<double> input, std::vector<double> filter, std::vector
         counter = 0;
         for (int j=0; j<paddingSize; j++){
             paddedOutput[j] = paddedInput[counter];
-            counter +=2;
-        }
-        for (int j=0; j<paddingSize; j++){
             paddedOutput[j] = (double)paddedOutput[j] / (double)N;
             paddedOutput[j] = (double)paddedOutput[j] * (double)1.7;    //turn the gain up a little bit
+            counter +=2;
         }
         for (int j=0; j<m; j++){
             paddedOutput[j] = paddedOutput[j] + OLAP[j];
