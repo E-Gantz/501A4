@@ -18,55 +18,61 @@
 #define MONOPHONIC        1
 #define STEREOPHONIC      2
 
+#define SIZE       8
+#define PI         3.141592653589793
+#define TWO_PI     (2.0 * PI)
+#define SWAP(a,b)  tempr=(a);(a)=(b);(b)=tempr
+
 //NOTE: according to http://soundfile.sapp.org/doc/WaveFormat/ " 16-bit samples are stored as 2's-complement signed integers, ranging from -32768 to 32767. "
 
-//convert a 16-bit 2's-complement signed integer to a float scaled to -1.0 to +1.0
-float sampleToFloat(int16_t value){
+//convert a 16-bit 2's-complement signed integer to a double scaled to -1.0 to +1.0
+double sampleTodouble(int16_t value){
    int16_t maxVal = 32767;
 
    if (value < 0){
         int16_t absValue = abs(value);
-        float result = (float)absValue / (float)maxVal;
+        double result = (double)absValue / (double)maxVal;
         return -result;
    }
    else {
-        float result = (float)value / (float)maxVal;
+        double result = (double)value / (double)maxVal;
         return result;
    }
 }
 
-//convert a float scaled to -1.0 to +1.0 to a 16-bit 2's-complement signed integer
-int16_t floatToSample(float value){
+//convert a double scaled to -1.0 to +1.0 to a 16-bit 2's-complement signed integer
+int16_t doubleToSample(double value){
     int16_t maxVal = 32767;
     int16_t result;
-    if (value > 1.0){
-        result = maxVal;
-    }
-    else if (value < -1.0){
-        result = -maxVal;
-    }
-    else {
-        result = rint(value * maxVal);
-    }
+    // if (value > 1.0){
+    //     result = maxVal;
+    // }
+    // else if (value < -1.0){
+    //     result = -maxVal;
+    // }
+    // else {
+    //     result = rint(value * maxVal);
+    // }
+    result = rint(value * maxVal);
 
     return result;
 }
 
-//convert the vector of wav samples to floats
-std::vector<float> samplesToFloats(std::vector<int16_t> samples){
-   std::vector<float> floatSamples;
+//convert the vector of wav samples to doubles
+std::vector<double> samplesTodoubles(std::vector<int16_t> samples){
+   std::vector<double> doubleSamples;
    for (int16_t sample : samples){
-        float convertedSample = sampleToFloat(sample);
-        floatSamples.push_back(convertedSample);
+        double convertedSample = sampleTodouble(sample);
+        doubleSamples.push_back(convertedSample);
    }
-   return floatSamples;
+   return doubleSamples;
 }
 
-//convert the vector of floats into wav samples
-std::vector<int16_t> floatsToSamples(std::vector<float> floatSamples){
+//convert the vector of doubles into wav samples
+std::vector<int16_t> doublesToSamples(std::vector<double> doubleSamples){
    std::vector<int16_t> samples;
-   for (float sample : floatSamples){
-        int16_t convertedSample = floatToSample(sample);
+   for (double sample : doubleSamples){
+        int16_t convertedSample = doubleToSample(sample);
         samples.push_back(convertedSample);
     }
    return samples;
@@ -202,20 +208,160 @@ void writeWavFile(char *filename, std::vector<int16_t> samples, int numberOfChan
     fclose(outputFileStream);
 }
 
-//taken from class notes
-void convolve(std::vector<float> x, int N, std::vector<float> h, int M, std::vector<float> &y, int P)
-{ // N is size of x, M is size of h, P is size of y
-    int n, m;
-    // /* Clear output buffer y[] */
-    // for (n = 0; n < P; n++){
-    //     y[n] = 0.0;
-    // }
-    /* Outer loop: process each input value x[n] in turn */
-    for (n = 0; n < N; n++) {
-    /* Inner loop: process x[n] with each sample of h[n] */
-        for (m = 0; m < M; m++){
-            y[n+m] = y[n+m] + (x[n] * h[m]);
+//  The four1 FFT from Numerical Recipes in C,
+//  p. 507 - 508.
+//  Note:  changed float data types to double.
+//  nn must be a power of 2, and use +1 for
+//  isign for an FFT, and -1 for the Inverse FFT.
+//  The data is complex, so the array size must be
+//  nn*2. This code assumes the array starts
+//  at index 1, not 0, so subtract 1 when
+//  calling the routine (see main() below).
+
+void four1(double data[], int nn, int isign)
+{
+    unsigned long n, mmax, m, j, istep, i;
+    double wtemp, wr, wpr, wpi, wi, theta;
+    double tempr, tempi;
+
+    n = nn << 1;
+    j = 1;
+
+    for (i = 1; i < n; i += 2) {
+	if (j > i) {
+	    SWAP(data[j], data[i]);
+	    SWAP(data[j+1], data[i+1]);
+	}
+	m = nn;
+	while (m >= 2 && j > m) {
+	    j -= m;
+	    m >>= 1;
+	}
+	j += m;
+    }
+
+    mmax = 2;
+    while (n > mmax) {
+	istep = mmax << 1;
+	theta = isign * (6.28318530717959 / mmax);
+	wtemp = sin(0.5 * theta);
+	wpr = -2.0 * wtemp * wtemp;
+	wpi = sin(theta);
+	wr = 1.0;
+	wi = 0.0;
+	for (m = 1; m < mmax; m += 2) {
+	    for (i = m; i <= n; i += istep) {
+		j = i + mmax;
+		tempr = wr * data[j] - wi * data[j+1];
+		tempi = wr * data[j+1] + wi * data[j];
+		data[j] = data[i] - tempr;
+		data[j+1] = data[i+1] - tempi;
+		data[i] += tempr;
+		data[i+1] += tempi;
+	    }
+	    wr = (wtemp = wr) * wpr - wi * wpi + wr;
+	    wi = wi * wpr + wtemp * wpi + wi;
+	}
+	mmax = istep;
+    }
+}
+
+int nearestPower(int M){
+    int i = 0;
+    while (true){
+        if (M <= pow(2, i)){
+            return pow(2,i);
         }
+        else {
+            i++;
+        }
+    }
+}
+
+//taken from 311-318 in the smith text
+void convolve(std::vector<double> input, std::vector<double> filter, std::vector<double> &y){
+    int N = input.size();
+    int M = filter.size();
+    int outSize = nearestPower(M);
+    int numInSamples = outSize-(M-1);
+    int numChunks = N/numInSamples;//fix this
+    int fftSize = outSize/2;
+
+    double XX[outSize];
+    std::vector<double> REX(fftSize, 0.0);
+    std::vector<double> IMX(fftSize, 0.0);
+    std::vector<double> REFR(fftSize, 0.0);
+    std::vector<double> IMFR(fftSize, 0.0);
+    std::vector<double> OLAP(M-1, 0.0);
+
+    //use FFT to fill in REFR and IMFR
+    for (int i=0; i<M; i++){
+        XX[i] = filter[i];
+    }
+    for (int i=M; i<outSize; i++){
+        XX[i] = 0.0;
+    }
+    four1(XX-1, fftSize, 1);
+    int counter = 0;
+    for (int i=0; i<outSize-1; i+=2){
+        REFR[counter] = XX[i];
+        IMFR[counter] = XX[i+1];
+        counter++;
+    }
+
+    for (int i=0; i<numChunks; i++){
+        //use FFT to fill REX and IMX
+        int inputOffset = i*numInSamples;
+        for (int j=0; j<numInSamples; j++){
+            XX[j] = input[inputOffset + j];
+        }
+        for (int j=numInSamples; j<outSize; j++){
+            XX[j] = 0.0;
+        }
+        four1(XX-1, fftSize, 1);
+        counter = 0;
+        for (int j=0; j<outSize-1; j+=2){
+            REX[counter] = XX[j];
+            IMX[counter] = XX[j+1];
+            counter++;
+        }
+
+        for (int j=0; j<fftSize; j++){
+            double temp = (REX[j]*REFR[j]) - (IMX[j]*IMFR[j]);
+            IMX[j] = (REX[j]*IMFR[j]) + (IMX[j]*REFR[j]);
+            REX[j] = temp;
+        }
+
+        //use IFFT to combine REX and IMX into XX
+        counter = 0;
+        for (int j=0; j<fftSize; j++){
+            XX[counter] = REX[i];
+            counter ++;
+            XX[counter] = IMX[i];
+            counter++;
+        }
+        four1(XX-1, fftSize, -1);
+
+        //Scale the output by N
+        for (int j=0; j<outSize; j++){
+            XX[j] = (double)XX[j] / (double)N;
+        }
+
+        for (int j=0; j<M-1; j++){
+            XX[j] = XX[j] + OLAP[j];
+        }
+
+        for (int j = numInSamples; j<outSize; j++){
+            OLAP[j-numInSamples] = XX[j];
+        }
+
+        for (int j=0; j<numInSamples; j++){
+            y[inputOffset + j] = XX[j];
+        }
+    }
+
+    for (int i=0; i<M-1; i++){
+        y[N-1 + i] = OLAP[i];
     }
 }
 
@@ -243,16 +389,16 @@ int main(int argc, char *argv[]){
         return 1;
     }
 
-    //ints to floats
-    std::vector<float> floatSamples = samplesToFloats(wavSamples);
-    std::vector<float> floatIR = samplesToFloats(irSamples);
-    std::vector<float> convolved(floatSamples.size() + floatIR.size() - 1, 0.0);
+    //ints to doubles
+    std::vector<double> doubleSamples = samplesTodoubles(wavSamples);
+    std::vector<double> doubleIR = samplesTodoubles(irSamples);
+    std::vector<double> convolved(doubleSamples.size() + doubleIR.size() - 1, 0.0);
 
     //convolution stuff
-    convolve(floatSamples, floatSamples.size(), floatIR, floatIR.size(), convolved, convolved.size());
-
-    //floats back to ints
-    std::vector<int16_t> outputSamples = floatsToSamples(convolved);
+    convolve(doubleSamples, doubleIR, convolved);
+    //doubles back to ints
+    std::vector<int16_t> outputSamples = doublesToSamples(convolved);
+    //std::vector<int16_t> outputSamples = doublesToSamples(doubleSamples);
 
     //Write the converted samples to a new WAV file
     writeWavFile(outputFile, outputSamples, 1);
