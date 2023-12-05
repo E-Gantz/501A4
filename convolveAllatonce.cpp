@@ -291,63 +291,54 @@ void zeroPadding(std::vector<double> input, int inSize, double output[], int fin
 void convolve(std::vector<double> input, std::vector<double> filter, std::vector<double> &y){
     int N = input.size();
     int M = filter.size();
-    int output_size = (M)*2;
+    int output_size = N+(M-1);
+
     int paddingSize = nearestPower(output_size);
-    int numChunkSamples = (paddingSize-(M-1));
-    int numChunks = rint((double)N/(double)numChunkSamples);
-    std::vector<double> OLAP(M-1, 0.0);
+    // int paddingSize = 1;
+    // while (paddingSize < output_size){
+    //     paddingSize*=2;
+    // }
 
     double* paddedInput = new double[2*paddingSize];
     double* paddedImpulse = new double[2*paddingSize];
-    double* paddedOutput = new double[paddingSize];
+    double* paddedOutput = new double[2*paddingSize];
 
     for(int i=0; i<2*paddingSize; i++){
+        paddedInput[i] = 0.0;
         paddedImpulse[i] = 0.0;
+        paddedOutput[i] = 0.0;
     }
 
+    zeroPadding(input, N, paddedInput, 2*paddingSize);
     zeroPadding(filter, M, paddedImpulse, 2*paddingSize);
+    four1(paddedInput-1, paddingSize, 1);
     four1(paddedImpulse-1, paddingSize, 1);
 
-    for (int i=0; i<numChunks; i++){
-        int inputOffset = i*numChunkSamples;
-        for(int j=0; j<2*paddingSize; j++){
-            paddedInput[j] = 0.0;
-        }
-        int counter = 0;
-        for (int j=0; j<numChunkSamples; j++){
-            paddedInput[counter] = input[inputOffset + j];
-            counter += 2;
-        }
-        four1(paddedInput-1, paddingSize, 1);
-        //complex multiplication
-        for (int j=0; j<2*paddingSize; j+=2){
-            double temp = (paddedInput[j]*paddedImpulse[j]) - (paddedInput[j+1]*paddedImpulse[j+1]);
-            paddedInput[j+1] = (paddedInput[j]*paddedImpulse[j+1]) + (paddedInput[j+1]*paddedImpulse[j]);
-            paddedInput[j] = temp;
-        }
-        four1(paddedInput-1, paddingSize, -1);
-        counter = 0;
-        for (int j=0; j<paddingSize; j++){
-            paddedOutput[j] = paddedInput[counter];
-            counter +=2;
-        }
-        for (int j=0; j<paddingSize; j++){
-            paddedOutput[j] = (double)paddedOutput[j] / (double)N;
-            paddedOutput[j] = (double)paddedOutput[j] * (double)1.7;    //turn the gain up a little bit
-        }
-        for (int j=0; j<M-1; j++){
-            paddedOutput[j] = paddedOutput[j] + OLAP[j];
-        }
-        for (int j = numChunkSamples; j<paddingSize; j++){
-            OLAP[j-numChunkSamples] = paddedOutput[j];
-        }
-        for (int j=0; j<numChunkSamples; j++){
-            y[inputOffset + j] = paddedOutput[j];
-        }
+    //complex multiplication
+    for (int j=0; j<2*paddingSize; j+=2){
+        double temp = (paddedInput[j]*paddedImpulse[j]) - (paddedInput[j+1]*paddedImpulse[j+1]);
+        paddedInput[j+1] = (paddedInput[j]*paddedImpulse[j+1]) + (paddedInput[j+1]*paddedImpulse[j]);
+        paddedInput[j] = temp;
     }
-    int inputOffset = (numChunks)*numChunkSamples;
-    for (int j=0; j<M-1; j++){
-        y[inputOffset + j] = OLAP[j];
+    for (int i=0; i<2*paddingSize; i++){
+        paddedOutput[i] = paddedInput[i];
+    }
+
+    // for (int j=0; j<2*paddingSize; j++){
+    //     paddedOutput[j] = paddedInput[j] * paddedImpulse[j];
+    // }
+
+    four1(paddedOutput-1, paddingSize, -1);
+
+    for (int j=0; j<2*paddingSize; j++){
+        paddedOutput[j] = (double)paddedOutput[j] / (double)N;
+        paddedOutput[j] = (double)paddedOutput[j] / (double)4.0;
+    }
+
+    int counter = 0;
+    for (int j=0; j<y.size(); j++){
+        y[j] = paddedOutput[counter];
+        counter+=2;
     }
 }
 
