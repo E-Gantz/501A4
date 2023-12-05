@@ -1,6 +1,7 @@
 **House Keeping**
 Timing reports are output from the Measure-Command utility on windows 11, these are in the timings folder.
 GuitarDry.wav and bigHall.wav were used for all timings.
+all output wav files are in the outputs folder
 
 The baseline version can be found in convolveBaseline.cpp
 Baseline Version Time: 823738.9601ms
@@ -10,6 +11,10 @@ The first optimization I did was an algorithm-based optimization.
 I chose to use the overlap-add algorithm from p.311-318 in the Smith text, and I used the four1 FFT that we were given.
 this version can be found at https://github.com/E-Gantz/501A4/blob/4d924f5712a7861c261599857af767ff1202c9a5/convolve.cpp
 Algorithm optimized time: 3542.7792ms
+
+However, I want to note that if one wanted to optimize the baseline/time-domain convolution before replacing it entirely with frequency-domain convolution, they could swap the order of the for loops.
+This is because the outer loop is for each sample in the input, and the inner for loop is for each sample in the filter.
+In most cases the filter will be significantly shorter than the input, and thus it would be an improvement to have the outer loop be the filter. i.e. smaller loop on the outside.
 
 Next I started using a profiler to see where I could do some manual tuning.
 To do this I used gprof and compiled with "g++ -Wall -pg -no-pie -o convolve convolve.cpp"
@@ -36,4 +41,13 @@ manual tuning time: 1434.0383ms
 I then noticed I had a lot of little for loops within the convolve function, and looked for some that I could jam together.
 I had two consecutive "for (int j=0; j<paddingSize; j++)" loops, one to fill the output vector from the real part of the post IFFT vector, and one to scale the values, so I combined these into one loop.
 at this point four1 had gone up to over 80% of the run time according to gprof, which shows that I increased the speed of the other parts.
+Another jamming could be combining the 'set everything to 0' and 'fill in the real parts' loops that I use before the first two four1 calls, but I had issues with doing both things in one loop earlier so I'm going to leave them as is.
+this version can be found at https://github.com/E-Gantz/501A4/blob/5d3ab58e6d4cbcd7b88b5c5b0c22e081cd0e508d/convolve.cpp
 manual tuning time: 1322.2385ms
+
+A further manual tuning could be replacing some operations, such as finding the nearest power of 2, with bitwise operations rather than with calculations.
+However, I'm not very familiar with bitwise operations, so I'm going to only mention this and not attempt it.
+
+My final optimization was a compiler optimization, I changed from compiling with "g++ -o convolve convolve.cpp" to "g++ -O3 -o convolve convolve.cpp"
+compiler optimized time: 1639.857ms
+I find it interesting that compiling with -03 produces a slightly slower program than compiling normally
