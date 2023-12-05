@@ -27,18 +27,6 @@
 
 //convert a 16-bit 2's-complement signed integer to a double scaled to -1.0 to +1.0
 double sampleTodouble(int16_t value){
-//    int16_t maxVal = 32767;
-
-//    if (value < 0){
-//         double absValue = abs(value);
-//         double result = (double)absValue / (double)maxVal;
-//         return -result;
-//    }
-//    else {
-//         double result = (double)value / (double)maxVal;
-//         return result;
-//    }
-
     return double(value) / (double)32767.0;
 }
 
@@ -279,14 +267,6 @@ int nearestPower(int M){
     }
 }
 
-void zeroPadding(std::vector<double> input, int inSize, double output[], int finalSize){
-    int counter = 0;
-    for (int i=0; i<inSize; i++){
-        output[counter] = input[i];
-        counter += 2;
-    }
-}
-
 //taken from tut slides and 311-318 in the smith text
 void convolve(std::vector<double> input, std::vector<double> filter, std::vector<double> &y){
     int N = input.size();
@@ -394,8 +374,6 @@ int main(int argc, char *argv[]){
 
     //Write the converted samples to a new WAV file
     writeWavFile(outputFile, outputSamples, 1);
-
-    std::cout << "Reverbification complete. Output file: " << outputFile << std::endl;
 
     return 0;
 }

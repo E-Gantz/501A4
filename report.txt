@@ -8,8 +8,16 @@ Baseline Version Time: 823738.9601ms
 **Optimizations**
 The first optimization I did was an algorithm-based optimization.
 I chose to use the overlap-add algorithm from p.311-318 in the Smith text, and I used the four1 FFT that we were given.
+this version can be found at https://github.com/E-Gantz/501A4/blob/4d924f5712a7861c261599857af767ff1202c9a5/convolve.cpp
 Algorithm optimized time: 3542.7792ms
 
-Next I did a compiler-level optimization. I changed from compiling with "g++ -o convolve convolve.cpp" to "g++ -O3 -o convolve convolve.cpp"
-At this point I also started using the diff command to do regression testing.
-compiler optimized time: 1653.1691ms
+Next I started using a profiler to see where I could do some manual tuning.
+To do this I used gprof and compiled with "g++ -Wall -pg -no-pie -o convolve convolve.cpp"
+    note: the -no-pie flag is there because I was getting empty gprof output which is apparently a gcc bug: https://stackoverflow.com/questions/42620074/gprof-produces-empty-output
+At this point I also started using the diff command to do regression testing to compare output files.
+
+The gprof output claimed that 75% of output time was in four1, which I was too scared to touch, so I just looked through the code to find things to optimize.
+My first manual tuning was to remove unnecessary code.
+First I found that in sampleToDouble I was checking if the input value was negative and doing an absolute value calculation, so i just replaced that with "return double(value) / (double)32767.0;" to cut down on if statement calls and unnecessary operations.
+I also removed the final print statement, as it was unnecessary I/O, and the zeroPadding method as i had already inlined it.
+manual tuning time: 1397.9484ms
